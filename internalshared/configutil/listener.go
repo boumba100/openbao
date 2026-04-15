@@ -153,6 +153,10 @@ type Listener struct {
 	// `disable_unauthed_rekey_endpoints` value has to be set to false.
 	DisableUnauthedRekeyEndpoints    *bool       `hcl:"-"`
 	DisableUnauthedRekeyEndpointsRaw interface{} `hcl:"disable_unauthed_rekey_endpoints"`
+
+	// Configures the listener to expose public routes only.
+	// Public routes can accept and server unencrypted (non-tls) endpoints
+	PublicRoutes bool `hcl:"public_routes"`
 }
 
 // AgentAPI allows users to select which parts of the Agent API they want enabled.

@@ -22,6 +22,7 @@ type crlConfig struct {
 	Expiry                     string `json:"expiry"`
 	Disable                    bool   `json:"disable"`
 	OcspDisable                bool   `json:"ocsp_disable"`
+	OcspRfc5019Mode            bool   `json:"ocsp_rfc5019_mode"`
 	AutoRebuild                bool   `json:"auto_rebuild"`
 	AutoRebuildGracePeriod     string `json:"auto_rebuild_grace_period"`
 	OcspExpiry                 string `json:"ocsp_expiry"`
@@ -37,6 +38,7 @@ var defaultCrlConfig = crlConfig{
 	Disable:                    false,
 	OcspDisable:                false,
 	OcspExpiry:                 "12h",
+	OcspRfc5019Mode:            false,
 	AutoRebuild:                false,
 	AutoRebuildGracePeriod:     "12h",
 	EnableDelta:                false,
@@ -72,6 +74,10 @@ valid; defaults to 72 hours`,
 				Description: `The amount of time an OCSP response will be valid (controls 
 the NextUpdate field); defaults to 12 hours`,
 				Default: "1h",
+			},
+			"ocsp_rfc5019_mode": {
+				Type:        framework.TypeBool,
+				Description: `If set to true, lightweight OCSP (RFC5019) will be enabled`,
 			},
 			"auto_rebuild": {
 				Type:        framework.TypeBool,
@@ -128,6 +134,11 @@ valid; defaults to 72 hours`,
 								Description: `The amount of time an OCSP response will be valid (controls 
 the NextUpdate field); defaults to 12 hours`,
 								Required: true,
+							},
+							"ocsp_rfc5019_mode": {
+								Type:        framework.TypeBool,
+								Description: `If set to true, lightweight OCSP (RFC5019) will be enabled`,
+								Required:    true,
 							},
 							"auto_rebuild": {
 								Type:        framework.TypeBool,
@@ -187,6 +198,10 @@ valid; defaults to 72 hours`,
 								Description: `The amount of time an OCSP response will be valid (controls 
 the NextUpdate field); defaults to 12 hours`,
 								Default: "1h",
+							},
+							"ocsp_rfc5019_mode": {
+								Type:        framework.TypeBool,
+								Description: `If set to true, lightweight OCSP (RFC5019) will be enabled`,
 							},
 							"auto_rebuild": {
 								Type:        framework.TypeBool,
@@ -269,6 +284,10 @@ func (b *backend) pathCRLWrite(ctx context.Context, req *logical.Request, d *fra
 			return logical.ErrorResponse("ocsp_expiry must be greater than or equal to 0 got: %s", duration), nil
 		}
 		config.OcspExpiry = expiry
+	}
+
+	if ocspRfcMode5019Raw, ok := d.GetOk("ocsp_rfc5019_mode"); ok {
+		config.OcspRfc5019Mode = ocspRfcMode5019Raw.(bool)
 	}
 
 	oldAutoRebuild := config.AutoRebuild
@@ -367,6 +386,7 @@ func genResponseFromCrlConfig(config *crlConfig) *logical.Response {
 			"disable":                       config.Disable,
 			"ocsp_disable":                  config.OcspDisable,
 			"ocsp_expiry":                   config.OcspExpiry,
+			"ocsp_rfc5019_mode":             config.OcspRfc5019Mode,
 			"auto_rebuild":                  config.AutoRebuild,
 			"auto_rebuild_grace_period":     config.AutoRebuildGracePeriod,
 			"enable_delta":                  config.EnableDelta,
