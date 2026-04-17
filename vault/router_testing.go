@@ -20,7 +20,6 @@ type NoopBackend struct {
 
 	Root            []string
 	Login           []string
-	Public          []string
 	Paths           []string
 	Requests        []*logical.Request
 	Response        *logical.Response
@@ -81,7 +80,6 @@ func (n *NoopBackend) SpecialPaths() *logical.Paths {
 	return &logical.Paths{
 		Root:            n.Root,
 		Unauthenticated: n.Login,
-		Public:          n.Public,
 	}
 }
 

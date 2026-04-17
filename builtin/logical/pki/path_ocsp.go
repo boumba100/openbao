@@ -135,12 +135,6 @@ func (b *backend) ocspHandler(ctx context.Context, request *logical.Request, dat
 		return OcspUnauthorizedResponse, nil
 	}
 
-	// Public route is only enabled if RFC5019 mode is enabled
-	// RFC 5019 requires responders to handle and send HTTP responses
-	if request.PublicRoute && !cfg.OcspRfc5019Mode {
-		return OcspUnauthorizedResponse, nil
-	}
-
 	derReq, err := fetchDerEncodedRequest(request, data)
 	if err != nil {
 		return OcspMalformedResponse, nil

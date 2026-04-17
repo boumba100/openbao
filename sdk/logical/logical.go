@@ -156,10 +156,6 @@ type Paths struct {
 	// On standby nodes, like all storage write operations, this will trigger
 	// an ErrReadOnly return.
 	WriteForwardedStorage []string
-
-	// Public paths are endpoints that can be served over an unencrypted (TLS-disabled) listener.
-	// They are intended for a secondary listener configured to expose only routes explicitly marked as public.
-	Public []string
 }
 
 type Auditor interface {

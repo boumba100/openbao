@@ -7,8 +7,6 @@ import (
 	"github.com/openbao/openbao/sdk/v2/logical"
 )
 
-// TODO: Rename file to public_routes_test_backend
-
 func TestPublicRoutesBackendFactory(_ context.Context, _ *logical.BackendConfig) (logical.Backend, error) {
 	publicRoutesBackend := testPublicRoutesBackend()
 	return publicRoutesBackend, nil
@@ -21,10 +19,6 @@ func testPublicRoutesBackend() logical.Backend {
 				"unauthenticated/private",
 				"unauthenticated/public",
 			},
-
-			Public: []string{
-				"unauthenticated/public",
-			},
 		},
 		Paths: []*framework.Path{
 			pathUnauthenticatedPrivate(),
@@ -33,11 +27,15 @@ func testPublicRoutesBackend() logical.Backend {
 		BackendType: logical.TypeLogical,
 	}
 
+	config := &logical.BackendConfig{
+		System: &logical.StaticSystemView{},
+	}
+
+	b.Setup(context.Background(), config)
+
 	return b
 }
 
-// TODO: Address duplication
-// TODO: Create generic handler function
 func pathUnauthenticatedPrivate() *framework.Path {
 	return &framework.Path{
 		Pattern: "unauthenticated/private",

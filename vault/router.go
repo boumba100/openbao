@@ -66,7 +66,6 @@ type routeEntry struct {
 	storagePrefix string
 	rootPaths     atomic.Value
 	loginPaths    atomic.Value
-	publicPaths   atomic.Value
 	l             sync.RWMutex
 }
 
@@ -203,12 +202,6 @@ func (r *Router) Mount(backend logical.Backend, prefix string, mountEntry *Mount
 		return err
 	}
 	re.loginPaths.Store(loginPathsEntry)
-
-	publicPathsEntry, err := parseSpecialPaths(paths.Public)
-	if err != nil {
-		return err
-	}
-	re.publicPaths.Store(publicPathsEntry)
 
 	switch {
 	case prefix == "":
@@ -975,19 +968,26 @@ func (r *Router) LoginPath(ctx context.Context, path string) bool {
 
 // isPublicPath checks if the requested path is marked as a public route
 func (r *Router) IsPublicPath(ctx context.Context, path string) bool {
-	pathSuffix, re := r.resolvePathEntry(ctx, path)
+	pathSuffix, _ := r.resolvePathEntry(ctx, path)
 
-	if re == nil {
+	if pathSuffix == "" {
 		return false
 	}
 
-	re.l.RLock()
-	defer re.l.RUnlock()
+	// Get the mount entry
+	mountEntry := r.MatchingMountEntry(ctx, path)
 
-	// Check the publicPaths of this backend
-	pe := re.publicPaths.Load().(*specialPathsEntry)
+	if mountEntry == nil {
+		return false
+	}
 
-	return r.pathMatchesEntry(pathSuffix, pe)
+	if allowedPathsRaw, ok := mountEntry.synthesizedConfigCache.Load("allowed_public_paths_entry"); ok {
+		allowedPaths := allowedPathsRaw.(*specialPathsEntry)
+		return r.pathMatchesEntry(pathSuffix, allowedPaths)
+	} else {
+		// No allowed public paths exist
+		return false
+	}
 }
 
 // resolvePathEntry

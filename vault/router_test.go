@@ -504,22 +504,41 @@ func TestRouter_IsPublicPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	n := &NoopBackend{
-		Public: []string{
-			"login",
-			"oauth/*",
-			"glob1*",
-			"+/wildcard/glob2*",
-			"end1/+",
-			"end2/+/",
-			"end3/+/*",
-			"middle1/+/bar",
-			"middle2/+/+/bar",
-			"+/begin",
-			"+/around/+/",
+	n := &NoopBackend{}
+
+	mountEntry := MountEntry{
+		UUID:        meUUID,
+		Accessor:    "authfooaccessor",
+		NamespaceID: namespace.RootNamespaceID,
+		namespace:   namespace.RootNamespace,
+		Config: MountConfig{
+			AllowedPublicPaths: []string{
+				"login",
+				"oauth/*",
+				"glob1*",
+				"+/wildcard/glob2*",
+				"end1/+",
+				"end2/+/",
+				"end3/+/*",
+				"middle1/+/bar",
+				"middle2/+/+/bar",
+				"+/begin",
+				"+/around/+/",
+			},
 		},
 	}
-	err = r.Mount(n, "auth/foo/", &MountEntry{UUID: meUUID, Accessor: "authfooaccessor", NamespaceID: namespace.RootNamespaceID, namespace: namespace.RootNamespace}, view)
+
+	err = mountEntry.SyncCache()
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+
+	err = r.Mount(
+		n,
+		"auth/foo/",
+		&mountEntry,
+		view,
+	)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}

@@ -99,11 +99,6 @@ func Backend(conf *logical.BackendConfig) *backend {
 				// ACME paths are added below
 			},
 
-			Public: []string{
-				"ocsp",   // OCSP POST
-				"ocsp/*", // OCSP GET
-			},
-
 			LocalStorage: []string{
 				revokedPath,
 				localDeltaWALPath,
