@@ -4253,6 +4253,10 @@ func (b *SystemBackend) mountPaths() []*framework.Path {
 					Type:        framework.TypeMap,
 					Description: strings.TrimSpace(sysHelp["tune_user_lockout_config"][0]),
 				},
+				"allowed_public_paths": {
+					Type:        framework.TypeCommaStringSlice,
+					Description: strings.TrimSpace(sysHelp["tune_allowed_public_paths"][0]),
+				},
 			},
 
 			Operations: map[logical.Operation]framework.OperationHandler{
@@ -4346,6 +4350,10 @@ func (b *SystemBackend) mountPaths() []*framework.Path {
 									Type:     framework.TypeBool,
 									Required: false,
 								},
+								"allowed_public_paths": {
+									Type:     framework.TypeCommaStringSlice,
+									Required: false,
+								},
 							},
 						}},
 					},
@@ -4418,6 +4426,10 @@ func (b *SystemBackend) mountPaths() []*framework.Path {
 				"plugin_version": {
 					Type:        framework.TypeString,
 					Description: strings.TrimSpace(sysHelp["plugin-catalog_version"][0]),
+				},
+				"allowed_public_paths": {
+					Type:        framework.TypeCommaStringSlice,
+					Description: strings.TrimSpace(sysHelp["tune_allowed_public_paths"][0]),
 				},
 			},
 

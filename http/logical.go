@@ -234,6 +234,13 @@ func buildLogicalRequestNoAuth(w http.ResponseWriter, r *http.Request) (*logical
 		req.ResponseWriter = logical.NewHTTPResponseWriter(responseWriter)
 	}
 
+	// Determine if it's a public route request
+	isPublicRouteRequest := r.Context().Value(PublicRouteRequestContextKey)
+
+	if isPublicRouteRequest != nil && isPublicRouteRequest.(bool) {
+		req.PublicRoute = isPublicRouteRequest.(bool)
+	}
+
 	return req, origBody, 0, nil
 }
 

@@ -123,7 +123,10 @@ func (c *Core) reloadMatchingPlugin(ctx context.Context, pluginName string) erro
 func (c *Core) reloadBackendCommon(ctx context.Context, entry *MountEntry, isAuth bool) error {
 	// Make sure our cache is up-to-date. Since some singleton mounts can be
 	// tuned, we do this before the below check.
-	entry.SyncCache()
+	err := entry.SyncCache()
+	if err != nil {
+		return err
+	}
 
 	// We don't want to reload the singleton mounts. They often have specific
 	// inmemory elements and we don't want to touch them here.
@@ -164,7 +167,6 @@ func (c *Core) reloadBackendCommon(ctx context.Context, entry *MountEntry, isAut
 	sysView := c.mountEntrySysView(entry)
 
 	var backend logical.Backend
-	var err error
 	oldSha := entry.RunningSha256
 	if !isAuth {
 		// Dispense a new backend
@@ -223,7 +225,7 @@ func (c *Core) reloadBackendCommon(ctx context.Context, entry *MountEntry, isAut
 	paths := backend.SpecialPaths()
 	if paths != nil {
 		re.rootPaths.Store(pathsToRadix(paths.Root))
-		loginPathsEntry, err := parseUnauthenticatedPaths(paths.Unauthenticated)
+		loginPathsEntry, err := parseSpecialPaths(paths.Unauthenticated)
 		if err != nil {
 			return err
 		}

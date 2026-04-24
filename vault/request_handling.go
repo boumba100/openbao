@@ -945,6 +945,16 @@ func (c *Core) handleCancelableRequest(ctx context.Context, req *logical.Request
 		}
 	}
 
+	// Verify public route
+	if req.PublicRoute {
+
+		// Verify that the requested path is marked as public
+		err = c.verifyPublicRouteRequest(ctx, req)
+		if err != nil {
+			return logical.ErrorResponse(fmt.Sprintf("%s", err)), err
+		}
+	}
+
 	var auth *logical.Auth
 	if c.isLoginRequest(ctx, req) {
 		resp, auth, err = c.handleLoginRequest(ctx, req)
@@ -1080,6 +1090,17 @@ func (c *Core) doRouting(ctx context.Context, req *logical.Request) (*logical.Re
 
 func (c *Core) isLoginRequest(ctx context.Context, req *logical.Request) bool {
 	return c.router.LoginPath(ctx, req.Path)
+}
+
+// verifyPublicRouteRequest returns nil if the request is permitted to proceed
+// on a plain HTTP listener. A request is permitted if the requested path has
+// been added to `allowed_public_paths` in the mount's tune configuration
+func (c *Core) verifyPublicRouteRequest(ctx context.Context, req *logical.Request) error {
+	if req != nil && req.PublicRoute && !c.router.IsPublicPath(ctx, req.Path) {
+		return ErrPublicPathRequestForbidden
+	}
+
+	return nil
 }
 
 func (c *Core) handleRequest(ctx context.Context, req *logical.Request) (retResp *logical.Response, retAuth *logical.Auth, retErr error) {

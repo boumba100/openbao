@@ -147,6 +147,10 @@ type Listener struct {
 	// an authenticated variant with new semantics is available on a new
 	// endpoint, this will be set to true (disabling request handling).
 	DisableUnauthedRekeyEndpoints bool `hcl:"disable_unauthed_rekey_endpoints"`
+
+	// Configures the listener to expose public routes only.
+	// Public routes can accept and server unencrypted (non-tls) endpoints
+	PublicRoutes bool `hcl:"public_routes"`
 }
 
 // AgentAPI allows users to select which parts of the Agent API they want enabled.

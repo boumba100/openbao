@@ -390,6 +390,7 @@ type MountConfig struct {
 	TokenType                 logical.TokenType     `json:"token_type,omitempty" structs:"token_type" mapstructure:"token_type"`
 	AllowedManagedKeys        []string              `json:"allowed_managed_keys,omitempty" mapstructure:"allowed_managed_keys"`
 	UserLockoutConfig         *UserLockoutConfig    `json:"user_lockout_config,omitempty" mapstructure:"user_lockout_config"`
+	AllowedPublicPaths        []string              `json:"allowed_public_paths,omitempty" mapstructure:"allowed_public_paths"`
 
 	// PluginName is the name of the plugin registered in the catalog.
 	//
@@ -496,7 +497,7 @@ func (e *MountEntry) APIPathNoNamespace() string {
 // SyncCache syncs tunable configuration values to the cache. In the case of
 // cached values, they should be retrieved via synthesizedConfigCache.Load()
 // instead of accessing them directly through MountConfig.
-func (e *MountEntry) SyncCache() {
+func (e *MountEntry) SyncCache() error {
 	if len(e.Config.AuditNonHMACRequestKeys) == 0 {
 		e.synthesizedConfigCache.Delete("audit_non_hmac_request_keys")
 	} else {
@@ -526,6 +527,22 @@ func (e *MountEntry) SyncCache() {
 	} else {
 		e.synthesizedConfigCache.Store("allowed_managed_keys", e.Config.AllowedManagedKeys)
 	}
+
+	if len(e.Config.AllowedPublicPaths) == 0 {
+		e.synthesizedConfigCache.Delete("allowed_public_paths")
+		e.synthesizedConfigCache.Delete("allowed_public_paths_entry")
+	} else {
+		e.synthesizedConfigCache.Store("allowed_public_paths", e.Config.AllowedPublicPaths)
+
+		allowedPublicPathsEntry, err := parseSpecialPaths(e.Config.AllowedPublicPaths)
+		if err != nil {
+			return err
+		}
+
+		e.synthesizedConfigCache.Store("allowed_public_paths_entry", allowedPublicPathsEntry)
+	}
+
+	return nil
 }
 
 func (entry *MountEntry) Deserialize() map[string]interface{} {
@@ -705,7 +722,10 @@ func (c *Core) mountInternal(ctx context.Context, entry *MountEntry, updateStora
 		entry.Accessor = accessor
 	}
 	// Sync values to the cache
-	entry.SyncCache()
+	err = entry.SyncCache()
+	if err != nil {
+		return err
+	}
 
 	view, err := c.mountEntryView(entry)
 	if err != nil {
@@ -1556,7 +1576,10 @@ func (c *Core) runMountUpdates(ctx context.Context, barrier logical.Storage, nee
 
 				// Since we're potentially updating the config here, sync the
 				// cache.
-				coreMount.SyncCache()
+				err = coreMount.SyncCache()
+				if err != nil {
+					return err
+				}
 				break
 			}
 		}
@@ -1626,7 +1649,10 @@ func (c *Core) runMountUpdates(ctx context.Context, barrier logical.Storage, nee
 		}
 
 		// Sync values to the cache
-		entry.SyncCache()
+		err = entry.SyncCache()
+		if err != nil {
+			return err
+		}
 	}
 	// Done if we have restored the mount table and we don't need
 	// to persist
@@ -1695,7 +1721,10 @@ func (c *Core) persistMounts(ctx context.Context, barrier logical.Storage, table
 
 		// We potentially modified the mount table entry so update the map
 		// accordingly.
-		entry.SyncCache()
+		err := entry.SyncCache()
+		if err != nil {
+			return err
+		}
 	}
 
 	// Handle writing the legacy mount table by default.

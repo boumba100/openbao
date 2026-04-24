@@ -145,7 +145,10 @@ func (c *Core) enableCredentialInternal(ctx context.Context, entry *MountEntry, 
 		entry.Accessor = accessor
 	}
 	// Sync values to the cache
-	entry.SyncCache()
+	err = entry.SyncCache()
+	if err != nil {
+		return err
+	}
 
 	view, err := c.mountEntryView(entry)
 	if err != nil {
@@ -785,7 +788,10 @@ func (c *Core) runCredentialUpdates(ctx context.Context, barrier logical.Storage
 		entry.namespace = ns
 
 		// Sync values to the cache
-		entry.SyncCache()
+		err = entry.SyncCache()
+		if err != nil {
+			return err
+		}
 	}
 
 	if !needPersist {
@@ -853,7 +859,10 @@ func (c *Core) persistAuth(ctx context.Context, barrier logical.Storage, table *
 
 		// We potentially modified the auth mount table entry so update the
 		// map accordingly.
-		entry.SyncCache()
+		err := entry.SyncCache()
+		if err != nil {
+			return err
+		}
 	}
 
 	// Handle writing the legacy auth mount table by default.

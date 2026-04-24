@@ -137,6 +137,8 @@ var (
 	// enabled in the configuration file
 	ErrIntrospectionNotEnabled = errors.New("The Vault configuration must set \"introspection_endpoint\" to true to enable this endpoint")
 
+	ErrPublicPathRequestForbidden = errors.New("public path request is forbidden")
+
 	// errNoMatchingMount is returned if the mount is not found
 	errNoMatchingMount = errors.New("no matching mount")
 

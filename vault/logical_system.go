@@ -1528,6 +1528,10 @@ func (b *SystemBackend) handleTuneReadCommon(ctx context.Context, path string) (
 		resp.Data["allowed_managed_keys"] = rawVal.([]string)
 	}
 
+	if rawVal, ok := mountEntry.synthesizedConfigCache.Load("allowed_public_paths"); ok {
+		resp.Data["allowed_public_paths"] = rawVal.([]string)
+	}
+
 	if mountEntry.Config.UserLockoutConfig != nil {
 		resp.Data["user_lockout_counter_reset_duration"] = int64(mountEntry.Config.UserLockoutConfig.LockoutCounterReset.Seconds())
 		resp.Data["user_lockout_threshold"] = mountEntry.Config.UserLockoutConfig.LockoutThreshold
@@ -1854,7 +1858,10 @@ func (b *SystemBackend) handleTuneWriteCommon(ctx context.Context, path string, 
 			return handleError(err)
 		}
 
-		mountEntry.SyncCache()
+		err = mountEntry.SyncCache()
+		if err != nil {
+			return handleError(err)
+		}
 
 		if b.Core.logger.IsInfo() {
 			b.Core.logger.Info("mount tuning of audit_non_hmac_request_keys successful", "path", path)
@@ -1880,7 +1887,10 @@ func (b *SystemBackend) handleTuneWriteCommon(ctx context.Context, path string, 
 			return handleError(err)
 		}
 
-		mountEntry.SyncCache()
+		err = mountEntry.SyncCache()
+		if err != nil {
+			return handleError(err)
+		}
 
 		if b.Core.logger.IsInfo() {
 			b.Core.logger.Info("mount tuning of audit_non_hmac_response_keys successful", "path", path)
@@ -1972,7 +1982,10 @@ func (b *SystemBackend) handleTuneWriteCommon(ctx context.Context, path string, 
 			return handleError(err)
 		}
 
-		mountEntry.SyncCache()
+		err = mountEntry.SyncCache()
+		if err != nil {
+			return handleError(err)
+		}
 
 		if b.Core.logger.IsInfo() {
 			b.Core.logger.Info("mount tuning of passthrough_request_headers successful", "path", path)
@@ -1997,7 +2010,10 @@ func (b *SystemBackend) handleTuneWriteCommon(ctx context.Context, path string, 
 			return handleError(err)
 		}
 
-		mountEntry.SyncCache()
+		err = mountEntry.SyncCache()
+		if err != nil {
+			return handleError(err)
+		}
 
 		if b.Core.logger.IsInfo() {
 			b.Core.logger.Info("mount tuning of allowed_response_headers successful", "path", path)
@@ -2023,7 +2039,47 @@ func (b *SystemBackend) handleTuneWriteCommon(ctx context.Context, path string, 
 			return handleError(err)
 		}
 
-		mountEntry.SyncCache()
+		err = mountEntry.SyncCache()
+		if err != nil {
+			return handleError(err)
+		}
+
+		if b.Core.logger.IsInfo() {
+			b.Core.logger.Info("mount tuning of allowed_managed_keys successful", "path", path)
+		}
+	}
+
+	// Allowed public paths
+	if rawVal, ok := data.GetOk("allowed_public_paths"); ok {
+		allowedPublicPaths := rawVal.([]string)
+
+		// Validate the paths
+		for _, allowedPublicPath := range allowedPublicPaths {
+			if ok, err := isValidSpecialPath(allowedPublicPath); !ok {
+				return nil, logical.CodedError(http.StatusBadRequest, fmt.Sprintf("Invalid path.\n%v", err))
+			}
+		}
+
+		oldVal := mountEntry.Config.AllowedPublicPaths
+		mountEntry.Config.AllowedPublicPaths = allowedPublicPaths
+
+		// Update the mount table
+		var err error
+		switch {
+		case strings.HasPrefix(path, "auth/"):
+			err = b.Core.persistAuth(ctx, nil, b.Core.auth, &mountEntry.Local, mountEntry.UUID)
+		default:
+			err = b.Core.persistMounts(ctx, nil, b.Core.mounts, &mountEntry.Local, mountEntry.UUID)
+		}
+		if err != nil {
+			mountEntry.Config.AllowedPublicPaths = oldVal
+			return handleError(err)
+		}
+
+		err = mountEntry.SyncCache()
+		if err != nil {
+			return handleError(err)
+		}
 
 		if b.Core.logger.IsInfo() {
 			b.Core.logger.Info("mount tuning of allowed_managed_keys successful", "path", path)
@@ -5875,5 +5931,8 @@ This path responds to the following HTTP methods.
 	PUT /<path>
 		Unlock the API for a namespace.
 		`,
+	},
+	"tune_allowed_public_paths": {
+		"Paths that can be accessed via a public listener (configured with `public_routes = true`)",
 	},
 }

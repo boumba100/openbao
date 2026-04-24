@@ -76,8 +76,8 @@ type wildcardPath struct {
 	isPrefix bool
 }
 
-// loginPathsEntry is used to hold the routeEntry loginPaths
-type loginPathsEntry struct {
+// specialPathsEntry is used to hold the routeEntry loginPaths
+type specialPathsEntry struct {
 	paths         *radix.Tree
 	wildcardPaths []wildcardPath
 }
@@ -197,7 +197,7 @@ func (r *Router) Mount(backend logical.Backend, prefix string, mountEntry *Mount
 		storageView:   storageView,
 	}
 	re.rootPaths.Store(pathsToRadix(paths.Root))
-	loginPathsEntry, err := parseUnauthenticatedPaths(paths.Unauthenticated)
+	loginPathsEntry, err := parseSpecialPaths(paths.Unauthenticated)
 	if err != nil {
 		return err
 	}
@@ -914,14 +914,52 @@ func (r *Router) RootPath(ctx context.Context, path string) bool {
 }
 
 // LoginPath checks if the given path is used for logins
-// Matching Priority
-//  1. prefix
-//  2. exact
-//  3. wildcard
 func (r *Router) LoginPath(ctx context.Context, path string) bool {
+	pathSuffix, re := r.resolvePathEntry(ctx, path)
+
+	if re == nil {
+		return false
+	}
+
+	re.l.RLock()
+	defer re.l.RUnlock()
+
+	// Check the loginPaths of this backend
+	pe := re.loginPaths.Load().(*specialPathsEntry)
+
+	return r.pathMatchesEntry(pathSuffix, pe)
+}
+
+// isPublicPath checks if the requested path is marked as a public route
+func (r *Router) IsPublicPath(ctx context.Context, path string) bool {
+	pathSuffix, _ := r.resolvePathEntry(ctx, path)
+
+	if pathSuffix == "" {
+		return false
+	}
+
+	// Get the mount entry
+	mountEntry := r.MatchingMountEntry(ctx, path)
+
+	if mountEntry == nil {
+		return false
+	}
+
+	if allowedPathsRaw, ok := mountEntry.synthesizedConfigCache.Load("allowed_public_paths_entry"); ok {
+		allowedPaths := allowedPathsRaw.(*specialPathsEntry)
+		return r.pathMatchesEntry(pathSuffix, allowedPaths)
+	} else {
+		// No allowed public paths exist
+		return false
+	}
+}
+
+// resolvePathEntry
+// Returns path suffix and route entry
+func (r *Router) resolvePathEntry(ctx context.Context, path string) (string, *routeEntry) {
 	ns, err := namespace.FromContext(ctx)
 	if err != nil {
-		return false
+		return "", nil
 	}
 
 	adjustedPath := ns.Path + path
@@ -930,15 +968,20 @@ func (r *Router) LoginPath(ctx context.Context, path string) bool {
 	mount, raw, ok := r.root.LongestPrefix(adjustedPath)
 	r.l.RUnlock()
 	if !ok {
-		return false
+		return "", nil
 	}
-	re := raw.(*routeEntry)
 
 	// Trim to get remaining path
 	remain := strings.TrimPrefix(adjustedPath, mount)
 
-	// Check the loginPaths of this backend
-	pe := re.loginPaths.Load().(*loginPathsEntry)
+	return remain, raw.(*routeEntry)
+}
+
+// Matching Priority
+//  1. prefix
+//  2. exact
+//  3. wildcard
+func (r *Router) pathMatchesEntry(remain string, pe *specialPathsEntry) bool {
 	match, raw, ok := pe.paths.LongestPrefix(remain)
 	if !ok && len(pe.wildcardPaths) == 0 {
 		// no match found
@@ -1000,7 +1043,7 @@ func wildcardError(path, msg string) error {
 	return fmt.Errorf("path %q: invalid use of wildcards %s", path, msg)
 }
 
-func isValidUnauthenticatedPath(path string) (bool, error) {
+func isValidSpecialPath(path string) (bool, error) {
 	switch {
 	case strings.Count(path, "*") > 1:
 		return false, wildcardError(path, "(multiple '*' is forbidden)")
@@ -1014,13 +1057,13 @@ func isValidUnauthenticatedPath(path string) (bool, error) {
 	return true, nil
 }
 
-// parseUnauthenticatedPaths converts a list of special paths to a
-// loginPathsEntry
-func parseUnauthenticatedPaths(paths []string) (*loginPathsEntry, error) {
+// parseSpecialPaths converts a list of special paths to a
+// specialPathsEntry
+func parseSpecialPaths(paths []string) (*specialPathsEntry, error) {
 	var tempPaths []string
 	tempWildcardPaths := make([]wildcardPath, 0)
 	for _, path := range paths {
-		if ok, err := isValidUnauthenticatedPath(path); !ok {
+		if ok, err := isValidSpecialPath(path); !ok {
 			return nil, err
 		}
 
@@ -1042,7 +1085,7 @@ func parseUnauthenticatedPaths(paths []string) (*loginPathsEntry, error) {
 		}
 	}
 
-	return &loginPathsEntry{
+	return &specialPathsEntry{
 		paths:         pathsToRadix(tempPaths),
 		wildcardPaths: tempWildcardPaths,
 	}, nil
