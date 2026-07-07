@@ -1,7 +1,6 @@
 package public_routes
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/openbao/openbao/api/v2"
@@ -47,7 +46,7 @@ func TestPublicRoutes_PathAccess(t *testing.T) {
 	publicRouteClient := cluster.Cores[0].PublicRouteClient
 
 	// Ensure the that public and private routes cannot be accessed via the public listener since
-	// there are no 'allowed_public_paths' that are configured?
+	// 'expose_public_paths' has not been enabled
 	{
 		_, err = publicRouteClient.Logical().Read("test-backend/unauthenticated/private")
 		require.Error(t, err, "Access to the private route via the public route listener must be rejected")
@@ -56,11 +55,11 @@ func TestPublicRoutes_PathAccess(t *testing.T) {
 		require.Error(t, err, "Access to the public route via the public route listener must be rejected")
 	}
 
-	// Configure an allowed public path
+	// Enable 'expose_public_paths'
 	_, err = client.Logical().Write("/sys/mounts/test-backend/tune", map[string]interface{}{
-		"allowed_public_paths": []string{"unauthenticated/public"},
+		"expose_public_paths": true,
 	})
-	require.NoError(t, err, "Could not tune backend 'allowed_public_paths'")
+	require.NoError(t, err, "Could not tune backend 'expose_public_paths'")
 
 	{
 		// Ensure that the private path is still unaccessible via the public listener
@@ -72,11 +71,11 @@ func TestPublicRoutes_PathAccess(t *testing.T) {
 		require.NoError(t, err, "Could not access public path via public route listener")
 	}
 
-	// Remove allowed public paths
+	// Disable 'expose_public_paths'
 	_, err = client.Logical().Write("/sys/mounts/test-backend/tune", map[string]interface{}{
-		"allowed_public_paths": []string{},
+		"expose_public_paths": false,
 	})
-	require.NoError(t, err, "Could not tune backend 'allowed_public_paths'")
+	require.NoError(t, err, "Could not tune backend 'expose_public_paths'")
 
 	// Ensure that both paths are no longer accessible via the public listener
 	{
@@ -112,28 +111,28 @@ func TestPublicRoutes_Configure(t *testing.T) {
 		t.Fatalf("failed to mount test backend: %v", err)
 	}
 
-	// Configure list
-	validPaths := []string{
-		"random",
-		"this/that",
+	// Read default tuneConfig
+	{
+		tuneConfig, err := client.Logical().Read("/sys/mounts/test-backend/tune")
 
-		// Wildcard cases
-		"+/wildcard/glob2*",
-		"end1/+",
-		"end2/+/",
-		"end3/+/*",
-		"middle1/+/bar",
-		"middle2/+/+/bar",
-		"+/begin",
-		"+/around/+/",
+		require.NoError(t, err, "Could not read tune config")
+
+		require.NotNil(t, tuneConfig, "Could not read tune config")
+		require.NotNil(t, tuneConfig.Data, "Could not read tune config")
+		require.NotNil(t, tuneConfig.Data["expose_public_paths"], "'expose_public_paths' is nil")
+
+		exposePublicPathsVal, ok := tuneConfig.Data["expose_public_paths"].(bool)
+		if !ok {
+			t.Error("'expose_public_paths' value is not a boolean")
+		}
+		require.False(t, exposePublicPathsVal, "'expose_public_paths' must be set to true")
 	}
 
-	// Configure each path individually
-	for _, path := range validPaths {
+	// Enable 'expose_public_paths'
+	{
 		_, err = client.Logical().Write("/sys/mounts/test-backend/tune", map[string]interface{}{
-			"allowed_public_paths": []string{path},
+			"expose_public_paths": true,
 		})
-		require.NoError(t, err, fmt.Sprintf("Could not configure %s as an allowed public path", path))
 
 		tuneConfig, err := client.Logical().Read("/sys/mounts/test-backend/tune")
 
@@ -141,33 +140,20 @@ func TestPublicRoutes_Configure(t *testing.T) {
 
 		require.NotNil(t, tuneConfig, "Could not read tune config")
 		require.NotNil(t, tuneConfig.Data, "Could not read tune config")
-		require.NotNil(t, tuneConfig.Data["allowed_public_paths"], "Could not read tune config")
+		require.NotNil(t, tuneConfig.Data["expose_public_paths"], "'expose_public_paths' is nil")
 
-		configuredAllowedPublicPaths := tuneConfig.Data["allowed_public_paths"].([]interface{})
-		require.Contains(t, configuredAllowedPublicPaths, path)
-	}
-
-	// Unset the allowed public paths
-	{
-		_, err = client.Logical().Write("/sys/mounts/test-backend/tune", map[string]interface{}{
-			"allowed_public_paths": []string{},
-		})
-		require.NoError(t, err, "Could not unset allowed_public_paths")
-
-		tuneConfig, err := client.Logical().Read("/sys/mounts/test-backend/tune")
-		require.NoError(t, err, "Could not read tune config")
-
-		if tuneConfig.Data != nil && tuneConfig.Data["allowed_public_paths"] != nil {
-			require.Empty(t, tuneConfig.Data["allowed_public_paths"])
+		exposePublicPathsVal, ok := tuneConfig.Data["expose_public_paths"].(bool)
+		if !ok {
+			t.Error("'expose_public_paths' value is not a boolean")
 		}
+		require.True(t, exposePublicPathsVal, "'expose_public_paths' must be set to true")
 	}
 
-	// Configure a list of paths
+	// Disable 'expose_public_paths'
 	{
 		_, err = client.Logical().Write("/sys/mounts/test-backend/tune", map[string]interface{}{
-			"allowed_public_paths": validPaths,
+			"expose_public_paths": false,
 		})
-		require.NoError(t, err, "Could not configure list of allowed_public_paths")
 
 		tuneConfig, err := client.Logical().Read("/sys/mounts/test-backend/tune")
 
@@ -175,71 +161,12 @@ func TestPublicRoutes_Configure(t *testing.T) {
 
 		require.NotNil(t, tuneConfig, "Could not read tune config")
 		require.NotNil(t, tuneConfig.Data, "Could not read tune config")
-		require.NotNil(t, tuneConfig.Data["allowed_public_paths"], "Could not read tune config")
+		require.NotNil(t, tuneConfig.Data["expose_public_paths"], "'expose_public_paths' is nil")
 
-		configuredAllowedPublicPaths := tuneConfig.Data["allowed_public_paths"].([]interface{})
-
-		for _, path := range validPaths {
-			require.Contains(t, configuredAllowedPublicPaths, path)
+		exposePublicPathsVal, ok := tuneConfig.Data["expose_public_paths"].(bool)
+		if !ok {
+			t.Error("'expose_public_paths' value is not a boolean")
 		}
-	}
-
-	// Should reject invalid paths
-	invalidPaths := []string{
-		// multiple *
-		"a*b*c",
-		"secret/*/foo*",
-		"**",
-		"secret/**",
-		"foo*bar*",
-		"*/foo/*",
-
-		// +* forbidden
-		"+*",
-		"secret/+*/foo",
-		"secret/foo+*",
-		"+*/bar",
-		"foo/+*",
-
-		// * not at end
-		"*foo",
-		"secret/*/bar",
-		"secret/foo*bar",
-		"secret/*foo",
-		"*/foo",
-		"foo*bar/baz",
-
-		// + adjacent to non-slash
-		"secret+",
-		"+secret",
-		"secret/foo+bar",
-		"secret/foo+",
-		"secret/+foo",
-		"secret/foo+/",
-		"foo+bar",
-		"a+b",
-		"++",
-
-		// combined edge cases
-		"secret/+*/foo",
-		"secret/*foo*",
-		"+*foo",
-		"foo+*bar*",
-		"secret++/foo",
-	}
-
-	for _, path := range invalidPaths {
-		_, err = client.Logical().Write("/sys/mounts/test-backend/tune", map[string]interface{}{
-			"allowed_public_paths": []string{path},
-		})
-		require.Error(t, err, fmt.Sprintf("Invalid path was not rejected: %s", path))
-
-		tuneConfig, err := client.Logical().Read("/sys/mounts/test-backend/tune")
-
-		require.NoError(t, err, "Could not read tune config")
-
-		if tuneConfig.Data != nil && tuneConfig.Data["allowed_public_paths"] != nil {
-			require.NotEmpty(t, tuneConfig.Data["allowed_public_paths"], path)
-		}
+		require.False(t, exposePublicPathsVal, "'expose_public_paths' must be set to false")
 	}
 }

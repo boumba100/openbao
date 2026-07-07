@@ -15,7 +15,7 @@ func wrapPublicRoutesHandler(h http.Handler, props *vault.HandlerProperties) htt
 	return http.HandlerFunc(func(writer http.ResponseWriter, req *http.Request) {
 		ctx := req.Context()
 
-		if props != nil && props.ListenerConfig != nil && props.ListenerConfig.PublicRoutes {
+		if props != nil && props.ListenerConfig != nil && props.ListenerConfig.OnlyPublicRoutes {
 			ctx = context.WithValue(req.Context(), PublicRouteRequestContextKey, true)
 		}
 

@@ -17,6 +17,8 @@ func testPublicRoutesBackend() logical.Backend {
 		PathsSpecial: &logical.Paths{
 			Unauthenticated: []string{
 				"unauthenticated/private",
+			},
+			AllowedPublicPaths: []string{
 				"unauthenticated/public",
 			},
 		},

@@ -4253,9 +4253,14 @@ func (b *SystemBackend) mountPaths() []*framework.Path {
 					Type:        framework.TypeMap,
 					Description: strings.TrimSpace(sysHelp["tune_user_lockout_config"][0]),
 				},
-				"allowed_public_paths": {
-					Type:        framework.TypeCommaStringSlice,
-					Description: strings.TrimSpace(sysHelp["tune_allowed_public_paths"][0]),
+				//// TODO: Remove
+				//"allowed_public_paths": {
+				//	Type:        framework.TypeCommaStringSlice,
+				//	Description: strings.TrimSpace(sysHelp["tune_allowed_public_paths"][0]),
+				//},
+				"expose_public_paths": {
+					Type:        framework.TypeBool,
+					Description: strings.TrimSpace(sysHelp["tune_expose_public_paths"][0]),
 				},
 			},
 
@@ -4350,9 +4355,13 @@ func (b *SystemBackend) mountPaths() []*framework.Path {
 									Type:     framework.TypeBool,
 									Required: false,
 								},
-								"allowed_public_paths": {
-									Type:     framework.TypeCommaStringSlice,
-									Required: false,
+								//"allowed_public_paths": {
+								//	Type:     framework.TypeCommaStringSlice,
+								//	Required: false,
+								//},
+								"expose_public_paths": {
+									Type:        framework.TypeBool,
+									Description: strings.TrimSpace(sysHelp["tune_expose_public_paths"][0]),
 								},
 							},
 						}},
@@ -4427,9 +4436,13 @@ func (b *SystemBackend) mountPaths() []*framework.Path {
 					Type:        framework.TypeString,
 					Description: strings.TrimSpace(sysHelp["plugin-catalog_version"][0]),
 				},
-				"allowed_public_paths": {
-					Type:        framework.TypeCommaStringSlice,
-					Description: strings.TrimSpace(sysHelp["tune_allowed_public_paths"][0]),
+				//"allowed_public_paths": {
+				//	Type:        framework.TypeCommaStringSlice,
+				//	Description: strings.TrimSpace(sysHelp["tune_allowed_public_paths"][0]),
+				//},
+				"expose_public_paths": {
+					Type:        framework.TypeBool,
+					Description: strings.TrimSpace(sysHelp["tune_expose_public_paths"][0]),
 				},
 			},
 

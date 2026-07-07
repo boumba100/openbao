@@ -1528,8 +1528,12 @@ func (b *SystemBackend) handleTuneReadCommon(ctx context.Context, path string) (
 		resp.Data["allowed_managed_keys"] = rawVal.([]string)
 	}
 
-	if rawVal, ok := mountEntry.synthesizedConfigCache.Load("allowed_public_paths"); ok {
-		resp.Data["allowed_public_paths"] = rawVal.([]string)
+	//if rawVal, ok := mountEntry.synthesizedConfigCache.Load("allowed_public_paths"); ok {
+	//	resp.Data["allowed_public_paths"] = rawVal.([]string)
+	//}
+
+	if rawVal, ok := mountEntry.synthesizedConfigCache.Load("expose_public_paths"); ok {
+		resp.Data["expose_public_paths"] = rawVal.(bool)
 	}
 
 	if mountEntry.Config.UserLockoutConfig != nil {
@@ -2049,42 +2053,76 @@ func (b *SystemBackend) handleTuneWriteCommon(ctx context.Context, path string, 
 		}
 	}
 
-	// Allowed public paths
-	if rawVal, ok := data.GetOk("allowed_public_paths"); ok {
-		allowedPublicPaths := rawVal.([]string)
+	if rawVal, ok := data.GetOk("expose_public_paths"); ok {
+		exposePublicPaths := rawVal.(bool)
 
-		// Validate the paths
-		for _, allowedPublicPath := range allowedPublicPaths {
-			if ok, err := isValidSpecialPath(allowedPublicPath); !ok {
-				return nil, logical.CodedError(http.StatusBadRequest, fmt.Sprintf("Invalid path.\n%v", err))
+		// Update only if the provided value is different from what is already configured
+		if exposePublicPaths != mountEntry.Config.ExposePublicPaths {
+
+			oldVal := mountEntry.Config.ExposePublicPaths
+			mountEntry.Config.ExposePublicPaths = exposePublicPaths
+
+			// Update the mount table
+			var err error
+			switch {
+			case strings.HasPrefix(path, "auth/"):
+				err = b.Core.persistAuth(ctx, nil, b.Core.auth, &mountEntry.Local, mountEntry.UUID)
+			default:
+				err = b.Core.persistMounts(ctx, nil, b.Core.mounts, &mountEntry.Local, mountEntry.UUID)
+			}
+			if err != nil {
+				mountEntry.Config.ExposePublicPaths = oldVal
+				return handleError(err)
+			}
+
+			err = mountEntry.SyncCache()
+			if err != nil {
+				return handleError(err)
+			}
+
+			if b.Core.logger.IsInfo() {
+				b.Core.logger.Info("mount tuning of expose_public_paths successful", "path", path)
 			}
 		}
 
-		oldVal := mountEntry.Config.AllowedPublicPaths
-		mountEntry.Config.AllowedPublicPaths = allowedPublicPaths
-
-		// Update the mount table
-		var err error
-		switch {
-		case strings.HasPrefix(path, "auth/"):
-			err = b.Core.persistAuth(ctx, nil, b.Core.auth, &mountEntry.Local, mountEntry.UUID)
-		default:
-			err = b.Core.persistMounts(ctx, nil, b.Core.mounts, &mountEntry.Local, mountEntry.UUID)
-		}
-		if err != nil {
-			mountEntry.Config.AllowedPublicPaths = oldVal
-			return handleError(err)
-		}
-
-		err = mountEntry.SyncCache()
-		if err != nil {
-			return handleError(err)
-		}
-
-		if b.Core.logger.IsInfo() {
-			b.Core.logger.Info("mount tuning of allowed_managed_keys successful", "path", path)
-		}
 	}
+
+	//// Allowed public paths
+	//if rawVal, ok := data.GetOk("allowed_public_paths"); ok {
+	//	allowedPublicPaths := rawVal.([]string)
+	//
+	//	// Validate the paths
+	//	for _, allowedPublicPath := range allowedPublicPaths {
+	//		if ok, err := isValidSpecialPath(allowedPublicPath); !ok {
+	//			return nil, logical.CodedError(http.StatusBadRequest, fmt.Sprintf("Invalid path.\n%v", err))
+	//		}
+	//	}
+	//
+	//	oldVal := mountEntry.Config.AllowedPublicPaths
+	//	mountEntry.Config.AllowedPublicPaths = allowedPublicPaths
+	//
+	//	// Update the mount table
+	//	var err error
+	//	switch {
+	//	case strings.HasPrefix(path, "auth/"):
+	//		err = b.Core.persistAuth(ctx, nil, b.Core.auth, &mountEntry.Local, mountEntry.UUID)
+	//	default:
+	//		err = b.Core.persistMounts(ctx, nil, b.Core.mounts, &mountEntry.Local, mountEntry.UUID)
+	//	}
+	//	if err != nil {
+	//		mountEntry.Config.AllowedPublicPaths = oldVal
+	//		return handleError(err)
+	//	}
+	//
+	//	err = mountEntry.SyncCache()
+	//	if err != nil {
+	//		return handleError(err)
+	//	}
+	//
+	//	if b.Core.logger.IsInfo() {
+	//		b.Core.logger.Info("mount tuning of allowed_managed_keys successful", "path", path)
+	//	}
+	//}
 
 	var err error
 	var resp *logical.Response
@@ -5932,7 +5970,10 @@ This path responds to the following HTTP methods.
 		Unlock the API for a namespace.
 		`,
 	},
-	"tune_allowed_public_paths": {
-		"Paths that can be accessed via a public listener (configured with `public_routes = true`)",
+	//"tune_allowed_public_paths": {
+	//	"Paths that can be accessed via a public listener (configured with `public_routes = true`)",
+	//},
+	"tune_expose_public_paths": {
+		"Allow the backend's public paths to be accessed via a public listener (configured with `public_routes = true`)",
 	},
 }

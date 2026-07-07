@@ -362,7 +362,17 @@ func TestRouter_LoginPath(t *testing.T) {
 			"+/around/+/",
 		},
 	}
-	err = r.Mount(n, "auth/foo/", &MountEntry{UUID: meUUID, Accessor: "authfooaccessor", NamespaceID: namespace.RootNamespaceID, namespace: namespace.RootNamespace}, view)
+	err = r.Mount(
+		n,
+		"auth/foo/",
+		&MountEntry{
+			UUID:        meUUID,
+			Accessor:    "authfooaccessor",
+			NamespaceID: namespace.RootNamespaceID,
+			namespace:   namespace.RootNamespace,
+		},
+		view,
+	)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -450,7 +460,7 @@ func TestRouter_LoginPath(t *testing.T) {
 	}
 }
 
-func TestRouter_IsPublicPath(t *testing.T) {
+func TestRouter_IsPublicPathWhenPublicPathsEnabled(t *testing.T) {
 	r := NewRouter()
 	_, barrier, _ := mockBarrier(t)
 	view := NewBarrierView(barrier, "auth/")
@@ -459,7 +469,21 @@ func TestRouter_IsPublicPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	n := &NoopBackend{}
+	n := &NoopBackend{
+		AllowedPublicPaths: []string{
+			"login",
+			"oauth/*",
+			"glob1*",
+			"+/wildcard/glob2*",
+			"end1/+",
+			"end2/+/",
+			"end3/+/*",
+			"middle1/+/bar",
+			"middle2/+/+/bar",
+			"+/begin",
+			"+/around/+/",
+		},
+	}
 
 	mountEntry := MountEntry{
 		UUID:        meUUID,
@@ -467,19 +491,7 @@ func TestRouter_IsPublicPath(t *testing.T) {
 		NamespaceID: namespace.RootNamespaceID,
 		namespace:   namespace.RootNamespace,
 		Config: MountConfig{
-			AllowedPublicPaths: []string{
-				"login",
-				"oauth/*",
-				"glob1*",
-				"+/wildcard/glob2*",
-				"end1/+",
-				"end2/+/",
-				"end3/+/*",
-				"middle1/+/bar",
-				"middle2/+/+/bar",
-				"+/begin",
-				"+/around/+/",
-			},
+			ExposePublicPaths: true,
 		},
 	}
 
@@ -577,6 +589,71 @@ func TestRouter_IsPublicPath(t *testing.T) {
 		out := r.IsPublicPath(namespace.RootContext(nil), tc.path)
 		if out != tc.expect {
 			t.Fatalf("bad: path: %s expect: %v got %v", tc.path, tc.expect, out)
+		}
+	}
+}
+
+func TestRouter_IsPublicPathWhenPublicPathsDisabled(t *testing.T) {
+	r := NewRouter()
+	_, barrier, _ := mockBarrier(t)
+	view := NewBarrierView(barrier, "auth/")
+
+	meUUID, err := uuid.GenerateUUID()
+	if err != nil {
+		t.Fatal(err)
+	}
+	n := &NoopBackend{
+		AllowedPublicPaths: []string{
+			"login",
+			"oauth/*",
+			"glob1*",
+			"+/wildcard/glob2*",
+			"end1/+",
+			"end2/+/",
+			"end3/+/*",
+			"middle1/+/bar",
+			"middle2/+/+/bar",
+			"+/begin",
+			"+/around/+/",
+		},
+	}
+
+	mountEntry := MountEntry{
+		UUID:        meUUID,
+		Accessor:    "authfooaccessor",
+		NamespaceID: namespace.RootNamespaceID,
+		namespace:   namespace.RootNamespace,
+		Config: MountConfig{
+			ExposePublicPaths: false,
+		},
+	}
+
+	err = mountEntry.SyncCache()
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+
+	err = r.Mount(
+		n,
+		"auth/foo/",
+		&mountEntry,
+		view,
+	)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+
+	paths := []string{
+		"random",
+		"auth/foo/login",
+		"auth/foo/oauth/",
+		"auth/foo/oauth/redirect/bar",
+	}
+
+	for _, path := range paths {
+		out := r.IsPublicPath(namespace.RootContext(nil), path)
+		if out != false {
+			t.Fatalf("Path: '%s' must not be considered to be a public path.", path)
 		}
 	}
 }

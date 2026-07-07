@@ -59,14 +59,15 @@ func NewRouter() *Router {
 
 // routeEntry is used to represent a mount point in the router
 type routeEntry struct {
-	tainted       bool
-	backend       logical.Backend
-	mountEntry    *MountEntry
-	storageView   logical.Storage
-	storagePrefix string
-	rootPaths     atomic.Value
-	loginPaths    atomic.Value
-	l             sync.RWMutex
+	tainted            bool
+	backend            logical.Backend
+	mountEntry         *MountEntry
+	storageView        logical.Storage
+	storagePrefix      string
+	rootPaths          atomic.Value
+	loginPaths         atomic.Value
+	allowedPublicPaths atomic.Value
+	l                  sync.RWMutex
 }
 
 type wildcardPath struct {
@@ -202,6 +203,13 @@ func (r *Router) Mount(backend logical.Backend, prefix string, mountEntry *Mount
 		return err
 	}
 	re.loginPaths.Store(loginPathsEntry)
+
+	// Allowed public paths
+	allowedPublicPathsEntry, err := parseSpecialPaths(paths.AllowedPublicPaths)
+	if err != nil {
+		return err
+	}
+	re.allowedPublicPaths.Store(allowedPublicPathsEntry)
 
 	switch {
 	case prefix == "":
@@ -932,26 +940,40 @@ func (r *Router) LoginPath(ctx context.Context, path string) bool {
 
 // isPublicPath checks if the requested path is marked as a public route
 func (r *Router) IsPublicPath(ctx context.Context, path string) bool {
-	pathSuffix, _ := r.resolvePathEntry(ctx, path)
-
-	if pathSuffix == "" {
-		return false
-	}
-
-	// Get the mount entry
+	// Validate the public paths are enabled for the target mount
 	mountEntry := r.MatchingMountEntry(ctx, path)
 
 	if mountEntry == nil {
 		return false
 	}
 
-	if allowedPathsRaw, ok := mountEntry.synthesizedConfigCache.Load("allowed_public_paths_entry"); ok {
-		allowedPaths := allowedPathsRaw.(*specialPathsEntry)
-		return r.pathMatchesEntry(pathSuffix, allowedPaths)
+	if exposePublicPathsRaw, ok := mountEntry.synthesizedConfigCache.Load("expose_public_paths"); ok {
+		exposePublicPaths, ok := exposePublicPathsRaw.(bool)
+
+		if !ok {
+			return false
+		}
+
+		if !exposePublicPaths {
+			return false
+		}
 	} else {
-		// No allowed public paths exist
 		return false
 	}
+
+	// Verify that the requested path is marked as an 'allowed public path' by the backend
+	pathSuffix, re := r.resolvePathEntry(ctx, path)
+
+	if re == nil {
+		return false
+	}
+
+	re.l.RLock()
+	defer re.l.RUnlock()
+
+	pe := re.allowedPublicPaths.Load().(*specialPathsEntry)
+
+	return r.pathMatchesEntry(pathSuffix, pe)
 }
 
 // resolvePathEntry

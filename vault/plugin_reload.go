@@ -230,6 +230,13 @@ func (c *Core) reloadBackendCommon(ctx context.Context, entry *MountEntry, isAut
 			return err
 		}
 		re.loginPaths.Store(loginPathsEntry)
+
+		// Allowed public paths
+		allowedPublicPathsEntry, err := parseSpecialPaths(paths.AllowedPublicPaths)
+		if err != nil {
+			return err
+		}
+		re.allowedPublicPaths.Store(allowedPublicPathsEntry)
 	}
 
 	return nil

@@ -390,7 +390,8 @@ type MountConfig struct {
 	TokenType                 logical.TokenType     `json:"token_type,omitempty" structs:"token_type" mapstructure:"token_type"`
 	AllowedManagedKeys        []string              `json:"allowed_managed_keys,omitempty" mapstructure:"allowed_managed_keys"`
 	UserLockoutConfig         *UserLockoutConfig    `json:"user_lockout_config,omitempty" mapstructure:"user_lockout_config"`
-	AllowedPublicPaths        []string              `json:"allowed_public_paths,omitempty" mapstructure:"allowed_public_paths"`
+
+	ExposePublicPaths bool `json:"expose_public_paths,omitempty" mapstructure:"expose_public_paths"`
 
 	// PluginName is the name of the plugin registered in the catalog.
 	//
@@ -528,19 +529,22 @@ func (e *MountEntry) SyncCache() error {
 		e.synthesizedConfigCache.Store("allowed_managed_keys", e.Config.AllowedManagedKeys)
 	}
 
-	if len(e.Config.AllowedPublicPaths) == 0 {
-		e.synthesizedConfigCache.Delete("allowed_public_paths")
-		e.synthesizedConfigCache.Delete("allowed_public_paths_entry")
-	} else {
-		e.synthesizedConfigCache.Store("allowed_public_paths", e.Config.AllowedPublicPaths)
+	// TODO: Remove
+	//if len(e.Config.AllowedPublicPaths) == 0 {
+	//	e.synthesizedConfigCache.Delete("allowed_public_paths")
+	//	e.synthesizedConfigCache.Delete("allowed_public_paths_entry")
+	//} else {
+	//	e.synthesizedConfigCache.Store("allowed_public_paths", e.Config.AllowedPublicPaths)
+	//
+	//	allowedPublicPathsEntry, err := parseSpecialPaths(e.Config.AllowedPublicPaths)
+	//	if err != nil {
+	//		return err
+	//	}
+	//
+	//	e.synthesizedConfigCache.Store("allowed_public_paths_entry", allowedPublicPathsEntry)
+	//}
 
-		allowedPublicPathsEntry, err := parseSpecialPaths(e.Config.AllowedPublicPaths)
-		if err != nil {
-			return err
-		}
-
-		e.synthesizedConfigCache.Store("allowed_public_paths_entry", allowedPublicPathsEntry)
-	}
+	e.synthesizedConfigCache.Store("expose_public_paths", e.Config.ExposePublicPaths)
 
 	return nil
 }

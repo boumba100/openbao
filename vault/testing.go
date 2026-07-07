@@ -1735,7 +1735,7 @@ func NewTestCluster(t testing.T, base *CoreConfig, opts *TestClusterOptions) *Te
 			// Create handler for public route listener
 			props := opts.DefaultHandlerProperties
 			props.ListenerConfig = &configutil.Listener{
-				PublicRoutes: true,
+				OnlyPublicRoutes: true,
 			}
 			props.Core = c
 

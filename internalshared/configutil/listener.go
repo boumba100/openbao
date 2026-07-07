@@ -150,7 +150,7 @@ type Listener struct {
 
 	// Configures the listener to expose public routes only.
 	// Public routes can accept and server unencrypted (non-tls) endpoints
-	PublicRoutes bool `hcl:"public_routes"`
+	OnlyPublicRoutes bool `hcl:"only_public_routes"`
 }
 
 // AgentAPI allows users to select which parts of the Agent API they want enabled.
